@@ -18,6 +18,10 @@ def days_to_mail_delivery():
     locale.setlocale (locale.LC_TIME, "sv_SE.UTF-8")
     next_mail_url = "https://portal.postnord.com/api/sendoutarrival/closest?postalCode=41872"
     response = requests.get(next_mail_url)
+
+    if response.status_code >= 400:
+        raise RuntimeError("unable to get page")
+
     data = response.json()
     delivery_str = data['delivery']
     delivery_time = datetime.strptime(delivery_str, "%d %B, %Y")
@@ -29,7 +33,7 @@ def days_to_mail_delivery():
     date_diff = delivery_date - today
     return date_diff.days
 
-def todays_prices():
+def todays_electrical_prices():
     log.info("getting todays electricity prices")
 
     today = datetime.strftime(datetime.today(), "%Y-%m-%d")
@@ -38,17 +42,33 @@ def todays_prices():
         "accept": "application/json,text/html;q=0.99,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"
     }
 
-    cookies = dict()
-
-    data_page_url = "https://www.vattenfall.se/elavtal/elpriser/timpris/"
-    requests.get(data_page_url, cookies=cookies, headers=headers)
-
     spot_price_url = f"https://www.vattenfall.se/api/price/spot/pricearea/{today}/{today}/SN3"
-    response = requests.get(spot_price_url, cookies=cookies, headers=headers)
+    response = requests.get(spot_price_url, headers=headers)
+
+    if response.status_code >= 400:
+        raise RuntimeError("unable to get page")
 
     prices = [ val['Value'] for val in response.json() ]
 
     return { "min": min(prices), "mean": mean(prices), "max": max(prices) }
+
+def retry(data_func):
+    retry_time_seconds = 3
+
+    # retry at most ten times
+    for i in range(0, 10):
+        try:
+            res = data_func()
+            if res != None:
+                return res
+        except Exception:
+            log.exception("retrieval raised an error")
+        
+        log.info(f"waiting to retry for {retry_time_seconds} seconds")
+        time.sleep(retry_time_seconds)
+        retry_time_seconds = retry_time_seconds * 2
+    
+    raise RuntimeError("retry failed")
 
 def draw_letter(draw, pos_x, pos_y, days):
     color = "GREEN"
@@ -107,8 +127,8 @@ def main():
 
     GPIO.setup(16, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
-    days = days_to_mail_delivery()
-    prices = todays_prices()
+    days = retry(days_to_mail_delivery)
+    prices = retry(todays_electrical_prices)
 
     next_update = tomorrow()
     log.info(f"next update time is {next_update}")
@@ -131,12 +151,16 @@ def main():
             LCD.LCD_ShowImage(image,0,0)
 
         elif (next_update - datetime.today()).total_seconds() < 0:
-            days = days_to_mail_delivery()
-            prices = todays_prices()
+            days = retry(days_to_mail_delivery)
+            prices = retry(todays_electrical_prices)
 
             next_update = tomorrow()
 
             log.info(f"next update time is {next_update}")
 
 if __name__ == '__main__':
-    main()
+    while True:
+        try:
+            main()
+        except RuntimeError:
+            log.exception("something unexpected occurred")
