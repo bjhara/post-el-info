@@ -13,6 +13,7 @@ logging.basicConfig(level="INFO")
 log = logging.getLogger("main")
 
 def days_to_mail_delivery():
+    """Get the number of days until the next mail delivery for postal code 41872"""
     log.info("getting days until mail delivery")
 
     locale.setlocale (locale.LC_TIME, "sv_SE.UTF-8")
@@ -34,6 +35,7 @@ def days_to_mail_delivery():
     return date_diff.days
 
 def todays_electrical_prices():
+    """Get todays electical prices for region SE3."""
     log.info("getting todays electricity prices")
 
     today = datetime.strftime(datetime.today(), "%Y-%m-%d")
@@ -53,6 +55,7 @@ def todays_electrical_prices():
     return { "min": min(prices), "mean": mean(prices), "max": max(prices) }
 
 def retry(data_func):
+    """Retry getting data from the supplied function using an exponential backoff."""
     retry_time_seconds = 3
 
     # retry at most ten times
