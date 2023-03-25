@@ -296,6 +296,12 @@ class LCD:
 		for i in range(0,len(_buffer),4096):
 			LCD_Config.SPI_Write_Byte(_buffer[i:i+4096])
 
+	def LCD_Backlight(self, on):
+		if on:
+			GPIO.output(LCD_Config.LCD_BL_PIN, GPIO.HIGH)
+		else:
+			GPIO.output(LCD_Config.LCD_BL_PIN, GPIO.LOW)
+
 	def LCD_ShowImage(self,Image,Xstart,Ystart):
 		if (Image == None):
 			return

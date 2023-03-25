@@ -103,11 +103,13 @@ def display_content(LCD, days, prices):
     draw_price(draw, 15, 40, prices)
 
     LCD.LCD_ShowImage(image,0,0)
+    LCD.LCD_Backlight(True)
 
     time.sleep(30)
 
     draw.rectangle([(0,0),(127,127)], fill="BLACK")
     LCD.LCD_ShowImage(image,0,0)
+    LCD.LCD_Backlight(False)
 
 def update_loop(LCD):
     days = retry(days_to_mail_delivery)
