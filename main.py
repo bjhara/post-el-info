@@ -75,17 +75,17 @@ def retry(data_func):
 
 def draw_letter(draw, pos_x, pos_y, days):
     color = "GREEN"
-    text = "IDAG"
+    text = "TODAY"
 
     if days == 1:
         color = "YELLOW"
-        text = "IMORGON"
+        text = "TOMORROW"
     elif days == 2:
         color = "ORANGE"
-        text = "OM 2 DAGAR"
+        text = "IN 2 DAYS"
     elif days > 2:
         color = "RED"
-        text = "SENARE"
+        text = "LATER"
 
     WIDTH = 30
     HEIGHT = 20
