@@ -66,5 +66,4 @@ def todays_electrical_prices():
 
     prices = [ val['Value'] for val in response.json() ]
 
-    return { "min": min(prices), "mean": mean(prices), "max": max(prices) }
-
+    return { "min": min(prices), "mean": mean(prices), "max": max(prices), "all": prices }

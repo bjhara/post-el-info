@@ -5,7 +5,12 @@ import random
 import time
 from PIL import Image, ImageDraw
 from datetime import datetime, timedelta
+from math import ceil
 from services import retry, days_to_mail_delivery, todays_electrical_prices
+
+LOW_PRICE = 50
+HIGH_PRICE = 130
+UPPER_DRAW_PRICE = 170
 
 logging.basicConfig(level="INFO")
 log = logging.getLogger("main")
@@ -34,21 +39,39 @@ def draw_letter(draw, pos_x, pos_y, days):
     draw.line([(pos_x, pos_y + HEIGHT), (pos_x + WIDTH, pos_y)], fill=color, width=2)
     draw.text((pos_x + WIDTH + 7, pos_y + 5), text)
 
+def color_for_price(price):
+    color = "RED"
+    if price < LOW_PRICE:
+        color = "GREEN"
+    elif price < HIGH_PRICE:
+        color = "YELLOW"
+    return color
+
 def draw_price(draw, pos_x, pos_y, price):
     WIDTH = (128 - pos_x * 2) // 3
     HEIGHT = 20
 
     start_x = pos_x
     for name in [ "min", "mean", "max"]:
-        color = "RED"
-        if price[name] < 50:
-            color = "GREEN"
-        elif price[name] < 150:
-            color = "YELLOW"
+        color = color_for_price(price[name])
 
         draw.rectangle([(start_x, pos_y), (start_x + WIDTH, pos_y + HEIGHT)], fill=color)
         draw.text((start_x + 3, pos_y + 5), name.upper(), fill="BLACK")
 
+        start_x = start_x + WIDTH
+
+    draw_all_prices(draw, pos_x, pos_y + HEIGHT + 3, price["all"])
+
+def draw_all_prices(draw, pos_x, pos_y, prices):
+    """Draw a small graph of all the given prices"""
+    WIDTH = (128 - pos_x * 2) // len(prices)
+    HEIGHT = 30
+
+    start_x = pos_x
+    for price in prices:
+        color = color_for_price(price)
+        price_height = max(min(ceil(HEIGHT * (price / UPPER_DRAW_PRICE)), HEIGHT), 1)
+        draw.rectangle([(start_x, pos_y), (start_x + WIDTH, pos_y + price_height)], fill=color)
         start_x = start_x + WIDTH
 
 def tomorrow():
@@ -76,8 +99,8 @@ def display_content(LCD, days, prices):
     draw = ImageDraw.Draw(image)
 
     draw.rectangle([(0,0),(127,127)], fill="BLACK")
-    draw_letter(draw, 15, 20, days)   
-    draw_price(draw, 15, 70, prices)
+    draw_letter(draw, 15, 10, days)   
+    draw_price(draw, 15, 40, prices)
 
     LCD.LCD_ShowImage(image,0,0)
 
