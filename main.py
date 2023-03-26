@@ -1,4 +1,3 @@
-import LCD_1in44
 import RPi.GPIO as GPIO
 import logging
 import random
@@ -7,6 +6,7 @@ from PIL import Image, ImageDraw
 from datetime import datetime, timedelta
 from math import ceil
 from services import retry, days_to_mail_delivery, todays_electrical_prices
+from WaveshareLcd import LCD, LCD_1IN44_Pins, LCD_1IN44_Config
 
 LOW_PRICE = 50
 HIGH_PRICE = 130
@@ -83,35 +83,32 @@ def tomorrow():
 
 def setup_hardware():
     """Initialise LCD and GPIO"""
-    LCD = LCD_1in44.LCD()
-
-    Lcd_ScanDir = LCD_1in44.SCAN_DIR_DFT  #SCAN_DIR_DFT = D2U_L2R
-    LCD.LCD_Init(Lcd_ScanDir)
-    LCD.LCD_Clear()
+    lcd = LCD(LCD_1IN44_Config, LCD_1IN44_Pins)
+    lcd.clear()
 
     GPIO.setup(16, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
-    return LCD
+    return lcd
 
-def display_content(LCD, days, prices):
+def display_content(lcd, days, prices):
     """Display content on screen for 30 seconds."""
-    image = Image.new("RGB", (LCD.width, LCD.height), "WHITE")
+    image = Image.new("RGB", (lcd.width, lcd.height), "WHITE")
     draw = ImageDraw.Draw(image)
 
     draw.rectangle([(0,0),(127,127)], fill="BLACK")
     draw_letter(draw, 15, 10, days)   
     draw_price(draw, 15, 40, prices)
 
-    LCD.LCD_ShowImage(image,0,0)
-    LCD.LCD_Backlight(True)
+    lcd.display_image(image)
+    lcd.backlight(True)
 
     time.sleep(30)
 
     draw.rectangle([(0,0),(127,127)], fill="BLACK")
-    LCD.LCD_ShowImage(image,0,0)
-    LCD.LCD_Backlight(False)
+    lcd.display_image(image)
+    lcd.backlight(False)
 
-def update_loop(LCD):
+def update_loop(lcd):
     days = retry(days_to_mail_delivery)
     prices = retry(todays_electrical_prices)
 
@@ -122,7 +119,7 @@ def update_loop(LCD):
         # display information when button is pressed
         channel = GPIO.wait_for_edge(16, GPIO.FALLING, timeout=10000)
         if channel is not None:
-            display_content(LCD, days, prices)
+            display_content(lcd, days, prices)
 
         elif (next_update - datetime.today()).total_seconds() < 0:
             days = retry(days_to_mail_delivery)
@@ -133,11 +130,11 @@ def update_loop(LCD):
             log.info(f"next update time is {next_update}")
 
 def main():
-    LCD = setup_hardware()
+    lcd = setup_hardware()
 
     while True:
         try:
-            update_loop(LCD)
+            update_loop(lcd)
         except RuntimeError:
             log.exception("something unexpected occurred")
 
