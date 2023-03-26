@@ -84,7 +84,9 @@ def tomorrow():
 def setup_hardware():
     """Initialise LCD and GPIO"""
     lcd = LCD(LCD_1IN44_Config, LCD_1IN44_Pins)
-    lcd.clear()
+    
+    lcd.backlight(False)
+    lcd.sleep_in(True)
 
     GPIO.setup(16, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
@@ -99,14 +101,16 @@ def display_content(lcd, days, prices):
     draw_letter(draw, 15, 10, days)   
     draw_price(draw, 15, 40, prices)
 
+    # wake it up and show the image
+    lcd.sleep_in(False)
     lcd.display_image(image)
     lcd.backlight(True)
 
     time.sleep(30)
 
-    draw.rectangle([(0,0),(127,127)], fill="BLACK")
-    lcd.display_image(image)
+    # go back to sleep
     lcd.backlight(False)
+    lcd.sleep_in(True)
 
 def update_loop(lcd):
     days = retry(days_to_mail_delivery)
