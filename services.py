@@ -2,12 +2,18 @@ import locale
 import logging
 import requests
 import time
-from statistics import mean
+
 from datetime import datetime
+from statistics import mean
+from typing import TypeVar, Callable, Any, Dict
+
+T = TypeVar("T")
+
 
 log = logging.getLogger("services")
 
-def retry(data_func):
+
+def retry(data_func: Callable[[], T]) -> T:
     """Retry getting data from the supplied function using an exponential backoff."""
     retry_time_seconds = 3
 
@@ -26,7 +32,7 @@ def retry(data_func):
     
     raise RuntimeError("retry failed")
 
-def days_to_mail_delivery():
+def days_to_mail_delivery() -> int:
     """Get the number of days until the next mail delivery for postal code 41872"""
     log.info("getting days until mail delivery")
 
@@ -48,7 +54,7 @@ def days_to_mail_delivery():
     date_diff = delivery_date - today
     return date_diff.days
 
-def todays_electrical_prices():
+def todays_electrical_prices() -> Dict[str, Any]:
     """Get todays electical prices for region SE3."""
     log.info("getting todays electricity prices")
 

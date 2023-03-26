@@ -5,8 +5,8 @@ from PIL import Image
 from typing import List
 
 import numpy as np
-import RPi.GPIO as GPIO
-import spidev
+import RPi.GPIO as GPIO # type: ignore
+import spidev # type: ignore
 import time
 
 
