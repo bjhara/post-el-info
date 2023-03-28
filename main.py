@@ -6,6 +6,7 @@ import time
 from PIL import Image, ImageDraw
 from datetime import datetime, timedelta
 from math import ceil
+from names import todays_names
 from services import retry, days_to_mail_delivery, todays_electrical_prices
 from typing import Any, Dict, List
 from WaveshareLcd import LCD, LCD_1IN44_Pins, LCD_1IN44_Config
@@ -76,6 +77,10 @@ def draw_all_prices(draw: ImageDraw.ImageDraw, pos_x: float, pos_y: float, price
         draw.rectangle(((start_x, pos_y), (start_x + WIDTH, pos_y + price_height)), fill=color)
         start_x = start_x + WIDTH
 
+def draw_names(draw: ImageDraw.ImageDraw, pos_x: float, pos_y: float, names: List[str]) -> None:
+    all_names = ", ".join(names)
+    draw.text((pos_x, pos_y), all_names.upper(), fill="WHITE")
+
 def tomorrow() -> datetime:
     """Get a date representing sometime early tomorrow with a bit of randomness"""
     next_day = datetime.today() + timedelta(days = 1)
@@ -94,7 +99,7 @@ def setup_hardware() -> LCD:
 
     return lcd
 
-def display_content(lcd: LCD, days: int, prices: Dict[str, Any]) -> None:
+def display_content(lcd: LCD, days: int, prices: Dict[str, Any], names: List[str]) -> None:
     """Display content on screen for 30 seconds."""
     image = Image.new("RGB", (lcd.width, lcd.height), "WHITE")
     draw = ImageDraw.Draw(image)
@@ -102,6 +107,7 @@ def display_content(lcd: LCD, days: int, prices: Dict[str, Any]) -> None:
     draw.rectangle(((0,0),(127,127)), fill="BLACK")
     draw_letter(draw, 15, 10, days)   
     draw_price(draw, 15, 40, prices)
+    draw_names(draw, 15, 105, names)
 
     # wake it up and show the image
     lcd.sleep_in(False)
@@ -117,6 +123,7 @@ def display_content(lcd: LCD, days: int, prices: Dict[str, Any]) -> None:
 def update_loop(lcd: LCD) -> None:
     days = retry(days_to_mail_delivery)
     prices = retry(todays_electrical_prices)
+    names = todays_names()
 
     next_update = tomorrow()
     log.info(f"next update time is {next_update}")
@@ -125,11 +132,12 @@ def update_loop(lcd: LCD) -> None:
         # display information when button is pressed
         channel = GPIO.wait_for_edge(16, GPIO.FALLING, timeout=10000)
         if channel is not None:
-            display_content(lcd, days, prices)
+            display_content(lcd, days, prices, names)
 
         elif (next_update - datetime.today()).total_seconds() < 0:
             days = retry(days_to_mail_delivery)
             prices = retry(todays_electrical_prices)
+            names = todays_names()
 
             next_update = tomorrow()
 
