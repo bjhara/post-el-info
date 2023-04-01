@@ -44,15 +44,13 @@ def days_to_mail_delivery() -> int:
         raise RuntimeError("unable to get page")
 
     data = response.json()
-    delivery_str = data['delivery']
-    delivery_time = datetime.strptime(delivery_str, "%d %B, %Y")
-    delivery_date = delivery_time.date()
 
-    today = datetime.today().date()
+    date_diff = _days_from_today(data['delivery'])
+    if date_diff < 0:
+        log.info(f"next delivery was earlier, '{data['delivery']}', today is {datetime.today()}")
+        date_diff = _days_from_today(data['upcoming'])
 
-    # datetime.today
-    date_diff = delivery_date - today
-    return date_diff.days
+    return date_diff
 
 def todays_electrical_prices() -> Dict[str, Any]:
     """Get todays electical prices for region SE3."""
@@ -73,3 +71,10 @@ def todays_electrical_prices() -> Dict[str, Any]:
     prices = [ val['Value'] for val in response.json() ]
 
     return { "min": min(prices), "mean": mean(prices), "max": max(prices), "all": prices }
+
+def _days_from_today(time_string: str) -> int:
+    parsed_time = datetime.strptime(time_string, "%d %B, %Y")
+    the_date = parsed_time.date()
+    today = datetime.today().date()
+
+    return (the_date - today).days
