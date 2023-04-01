@@ -1,7 +1,7 @@
 from datetime import datetime
-from typing import List
+from typing import List, Dict
 
-__names = {
+__names: Dict[str, List[str]]= {
   "01-01": [],
   "01-02": [
     "Svea"
