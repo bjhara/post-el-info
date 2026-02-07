@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from math import ceil
 from names import todays_names
 from services import retry, days_to_mail_delivery, todays_electrical_prices
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from WaveshareLcd import LCD, LCD_1IN44_Pins, LCD_1IN44_Config
 
 LOW_PRICE = 50
@@ -99,14 +99,18 @@ def setup_hardware() -> LCD:
 
     return lcd
 
-def display_content(lcd: LCD, days: int, prices: Dict[str, Any], names: List[str]) -> None:
+def display_content(lcd: LCD, days: Optional[int], prices: Optional[Dict[str, Any]], names: List[str]) -> None:
     """Display content on screen for 30 seconds."""
     image = Image.new("RGB", (lcd.width, lcd.height), "WHITE")
     draw = ImageDraw.Draw(image)
 
     draw.rectangle(((0,0),(127,127)), fill="BLACK")
-    draw_letter(draw, 15, 10, days)   
-    draw_price(draw, 15, 40, prices)
+    if days is not None:
+        draw_letter(draw, 15, 10, days)
+
+    if prices is not None:
+        draw_price(draw, 15, 40, prices)
+
     draw_names(draw, 15, 105, names)
 
     # wake it up and show the image

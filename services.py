@@ -5,7 +5,7 @@ import requests
 from datetime import datetime, time, timedelta
 from statistics import mean
 from time import sleep
-from typing import TypeVar, Callable, Any, Dict
+from typing import TypeVar, Callable, Any, Dict, Optional
 
 T = TypeVar("T")
 
@@ -13,7 +13,7 @@ T = TypeVar("T")
 log = logging.getLogger("services")
 
 
-def retry(data_func: Callable[[], T]) -> T:
+def retry(data_func: Callable[[], T]) -> Optional[T]:
     """Retry getting data from the supplied function using an exponential backoff."""
     retry_time_seconds = 3
 
@@ -30,7 +30,7 @@ def retry(data_func: Callable[[], T]) -> T:
         sleep(retry_time_seconds)
         retry_time_seconds = retry_time_seconds * 2
     
-    raise RuntimeError("retry failed")
+    return None
 
 def days_to_mail_delivery() -> int:
     """Get the number of days until the next mail delivery for postal code 41872"""
