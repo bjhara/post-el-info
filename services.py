@@ -2,7 +2,7 @@ import locale
 import logging
 import requests
 
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from statistics import mean
 from time import sleep
 from typing import TypeVar, Callable, Any, Dict
@@ -56,17 +56,17 @@ def todays_electrical_prices() -> Dict[str, Any]:
     """Get todays electical prices for region SE3."""
     log.info("getting todays electricity prices")
 
-    start_of_day = datetime.combine(datetime.today(), time.min)
-    sod_ts = int(start_of_day.timestamp())
-    end_of_day = datetime.combine(datetime.today(), time.max)
-    eod_ts = int(end_of_day.timestamp())
+    today = datetime.combine(datetime.today(), time.min)
+    today_ts = int(today.timestamp())
+    tomorrow = datetime.combine(datetime.today() + timedelta(days=1), time.max)
+    tomorrow_ts = int(tomorrow.timestamp())
 
     headers = {
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36 Edg/111.0.1661.41",
         "accept": "application/json,text/html;q=0.99,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
     }
 
-    spot_price_url = f"https://selfserviceapi.www.vattenfall.se/elements/nordpool/aggregatedspotprices?deliveryAreas=SE3&currency=SEK&deliveryStart={sod_ts}&deliveryEnd={eod_ts}&resolution=15mins&timezone=CET"
+    spot_price_url = f"https://selfserviceapi.www.vattenfall.se/elements/nordpool/aggregatedspotprices?deliveryAreas=SE3&currency=SEK&deliveryStart={today_ts}&deliveryEnd={tomorrow_ts}&resolution=15mins&timezone=CET"
     response = requests.get(spot_price_url, headers=headers)
 
     if response.status_code >= 400:
