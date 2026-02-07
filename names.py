@@ -218,6 +218,7 @@ __names: Dict[str, List[str]]= {
   "02-28": [
     "Maria"
   ],
+  "02-29": [""],
   "03-01": [
     "Albin",
     "Elvira"
