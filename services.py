@@ -2,7 +2,7 @@ import locale
 import logging
 import requests
 
-from datetime import datetime
+from datetime import datetime, time
 from statistics import mean
 from time import sleep
 from typing import TypeVar, Callable, Any, Dict
