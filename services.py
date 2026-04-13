@@ -2,7 +2,7 @@ import locale
 import logging
 import requests
 
-from datetime import datetime, time, timedelta
+from datetime import datetime, time, timedelta, timezone
 from statistics import mean
 from time import sleep
 from typing import TypeVar, Callable, Any, Dict, Optional
@@ -56,9 +56,10 @@ def todays_electrical_prices() -> Dict[str, Any]:
     """Get todays electical prices for region SE3."""
     log.info("getting todays electricity prices")
 
-    today = datetime.combine(datetime.today(), time.min)
+    tz = timezone.utc
+    today = datetime.combine(datetime.now(tz), time.min, tz)
     today_ts = int(today.timestamp())
-    tomorrow = datetime.combine(datetime.today() + timedelta(days=1), time.max)
+    tomorrow = datetime.combine(datetime.now(tz) + timedelta(days=1), time.max, tz)
     tomorrow_ts = int(tomorrow.timestamp())
 
     headers = {
