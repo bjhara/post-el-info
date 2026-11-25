@@ -151,9 +151,9 @@ def update_loop(lcd: LCD) -> None:
             log.info(f"next update time is {next_update}")
 
 def main() -> None:
-    lcd = setup_hardware()
-
+    lcd: Optional[LCD] = None
     try:
+        lcd = setup_hardware()
         while True:
             try:
                 update_loop(lcd)
@@ -162,8 +162,12 @@ def main() -> None:
     except KeyboardInterrupt:
         pass
     finally:
-        lcd.close()
-        GPIO.cleanup(BUTTON_PIN)
+        try:
+            if lcd is not None:
+                lcd.close()
+        finally:
+            if GPIO.getmode() is not None:
+                GPIO.cleanup(BUTTON_PIN)
 
 if __name__ == '__main__':
     main()

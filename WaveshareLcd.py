@@ -75,16 +75,28 @@ class LCD:
         self.__x_adjust = config.x
         self.__y_adjust = config.y
         self.__spi = spidev.SpiDev()
+        self.__closed = False
 
-        self.__init_lcd()
+        try:
+            self.__init_lcd()
+        except BaseException:
+            self.__release()
+            raise
 
     def close(self) -> None:
         """Turn off the display and release the SPI device and GPIO lines"""
+        if self.__closed:
+            return
         try:
             self.backlight(False)
             self.sleep_in(True)
         finally:
-            self.__spi.close()
+            self.__release()
+
+    def __release(self) -> None:
+        self.__closed = True
+        self.__spi.close()
+        if GPIO.getmode() is not None:
             GPIO.cleanup([self.__pins.rst, self.__pins.dc, self.__pins.bl])
 
     def __enter__(self) -> "LCD":

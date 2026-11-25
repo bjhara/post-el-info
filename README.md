@@ -20,6 +20,9 @@ sysfs/`/dev/gpiomem` access that `RPi.GPIO` relied on.
    sudo apt install python3-rpi-lgpio python3-spidev python3-numpy python3-pil python3-requests
    ```
 
+   If installing with pip instead, `spidev` must be version 3.4 or newer
+   (for `writebytes2`).
+
 3. Make sure the user running the program is a member of the `gpio` and `spi`
    groups (`sudo usermod -aG gpio,spi $USER`).
 
