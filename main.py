@@ -15,6 +15,9 @@ LOW_PRICE = 50
 HIGH_PRICE = 130
 UPPER_DRAW_PRICE = 170
 
+# KEY3 on the Waveshare 1.44inch LCD HAT (BCM numbering)
+BUTTON_PIN = 16
+
 logging.basicConfig(level="INFO")
 log = logging.getLogger("main")
 
@@ -89,13 +92,13 @@ def tomorrow() -> datetime:
     return next_day.replace(hour=0, minute=minute, second=second, microsecond=0)
 
 def setup_hardware() -> LCD:
-    """Initialise LCD and GPIO"""
+    """Initialise LCD and GPIO (GPIO mode is set to BCM by the LCD)"""
     lcd = LCD(LCD_1IN44_Config, LCD_1IN44_Pins)
     
     lcd.backlight(False)
     lcd.sleep_in(True)
 
-    GPIO.setup(16, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+    GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
     return lcd
 
@@ -134,7 +137,7 @@ def update_loop(lcd: LCD) -> None:
 
     while True:
         # display information when button is pressed
-        channel = GPIO.wait_for_edge(16, GPIO.FALLING, timeout=10000)
+        channel = GPIO.wait_for_edge(BUTTON_PIN, GPIO.FALLING, timeout=10000)
         if channel is not None:
             display_content(lcd, days, prices, names)
 
@@ -150,11 +153,17 @@ def update_loop(lcd: LCD) -> None:
 def main() -> None:
     lcd = setup_hardware()
 
-    while True:
-        try:
-            update_loop(lcd)
-        except RuntimeError:
-            log.exception("something unexpected occurred")
+    try:
+        while True:
+            try:
+                update_loop(lcd)
+            except RuntimeError:
+                log.exception("something unexpected occurred")
+    except KeyboardInterrupt:
+        pass
+    finally:
+        lcd.close()
+        GPIO.cleanup(BUTTON_PIN)
 
 if __name__ == '__main__':
     main()

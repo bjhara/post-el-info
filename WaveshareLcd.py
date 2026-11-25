@@ -1,8 +1,14 @@
-"""Library for Waveshare 1.44inch LCD HAT"""
+"""Library for Waveshare 1.44inch LCD HAT
+
+Uses the RPi.GPIO compatible API provided by python3-rpi-lgpio (which talks
+to /dev/gpiochipN through lgpio) and the kernel SPI driver via /dev/spidevB.D.
+SPI must be enabled (dtparam=spi=on) and the user needs to be a member of the
+gpio and spi groups.
+"""
 from dataclasses import dataclass
 from enum import Enum
 from PIL import Image
-from typing import List
+from typing import Sequence, Union
 
 import numpy as np
 import RPi.GPIO as GPIO # type: ignore
@@ -35,22 +41,28 @@ class Config:
 
 @dataclass(frozen=True)
 class PinConfig:
-    """Hardware interface configuration for the LCD"""
+    """Hardware interface configuration for the LCD
+
+    Pin numbers use BCM numbering. Chip select is not listed since it is
+    driven by the kernel SPI driver (CE0 for device 0); the GPIO is owned by
+    that driver and can not be claimed through lgpio.
+    """
     rst: int
     dc: int
-    cs: int
     bl: int
-    spi: spidev.SpiDev
+    spi_bus: int
+    spi_device: int
+    spi_speed_hz: int = 9000000
 
 
 LCD_1IN44_Config = Config(128, 128, 2, 1, True, ScanType.U2D_R2L)
 LCD_1IN8_Config = Config(160, 128, 1, 2, False, ScanType.U2D_R2L)
 
-# SPI device, bus = 0, device = 0
-__spi = spidev.SpiDev(0, 0)
+# SPI bus 0, device 0 (/dev/spidev0.0, chip select on CE0/GPIO 8)
+LCD_1IN44_Pins = PinConfig(rst=27, dc=25, bl=24, spi_bus=0, spi_device=0)
+LCD_1IN8_Pins = PinConfig(rst=27, dc=25, bl=24, spi_bus=0, spi_device=0)
 
-LCD_1IN44_Pins = PinConfig(27, 25, 8, 24, __spi)
-LCD_1IN8_Pins = PinConfig(27, 25, 8, 24, __spi)
+Bytes = Union[bytes, bytearray, Sequence[int]]
 
 
 class LCD:
@@ -62,8 +74,24 @@ class LCD:
         self.__height = config.height
         self.__x_adjust = config.x
         self.__y_adjust = config.y
+        self.__spi = spidev.SpiDev()
 
         self.__init_lcd()
+
+    def close(self) -> None:
+        """Turn off the display and release the SPI device and GPIO lines"""
+        try:
+            self.backlight(False)
+            self.sleep_in(True)
+        finally:
+            self.__spi.close()
+            GPIO.cleanup([self.__pins.rst, self.__pins.dc, self.__pins.bl])
+
+    def __enter__(self) -> "LCD":
+        return self
+
+    def __exit__(self, *_) -> None:
+        self.close()
 
     def __init_lcd(self) -> None:
         self.__init_gpio()
@@ -83,13 +111,13 @@ class LCD:
     def __init_gpio(self) -> None:
         GPIO.setmode(GPIO.BCM)
         GPIO.setwarnings(False)
-        GPIO.setup(self.__pins.rst, GPIO.OUT)
-        GPIO.setup(self.__pins.dc, GPIO.OUT)
-        GPIO.setup(self.__pins.cs, GPIO.OUT)
-        GPIO.setup(self.__pins.bl, GPIO.OUT)
+        GPIO.setup(self.__pins.rst, GPIO.OUT, initial=GPIO.HIGH)
+        GPIO.setup(self.__pins.dc, GPIO.OUT, initial=GPIO.LOW)
+        GPIO.setup(self.__pins.bl, GPIO.OUT, initial=GPIO.LOW)
 
-        self.__pins.spi.max_speed_hz = 9000000
-        self.__pins.spi.mode = 0b00
+        self.__spi.open(self.__pins.spi_bus, self.__pins.spi_device)
+        self.__spi.max_speed_hz = self.__pins.spi_speed_hz
+        self.__spi.mode = 0b00
 
     def __init_reg(self) -> None:
         # ST7735R frame rate
@@ -187,12 +215,12 @@ class LCD:
     def __write_reg(self, reg: int) -> None:
         """Set write register"""
         GPIO.output(self.__pins.dc, GPIO.LOW)
-        self.__pins.spi.writebytes([reg])
+        self.__spi.writebytes([reg])
 
-    def __write_data(self, data: List[int]) -> None:
-        """Write data to register"""
+    def __write_data(self, data: Bytes) -> None:
+        """Write data to register (writebytes2 splits large buffers itself)"""
         GPIO.output(self.__pins.dc, GPIO.HIGH)
-        self.__pins.spi.writebytes(data)
+        self.__spi.writebytes2(data)
 
     def __delay_ms(self, ms: int) -> None:
         time.sleep(ms / 1000)
@@ -281,11 +309,9 @@ class LCD:
 
     def clear(self) -> None:
         """Clear the screen by setting it to all white"""
-        buffer = [0xFF] * (self.__width * self.__height * 2)
+        buffer = b"\xff" * (self.__width * self.__height * 2)
         self.__set_window(0, 0, self.__width, self.__height)
-        GPIO.output(self.__pins.dc, GPIO.HIGH)
-        for i in range(0, len(buffer), 4096):
-            self.__write_data(buffer[i : i + 4096])
+        self.__write_data(buffer)
 
     def backlight(self, on: bool) -> None:
         """Turn the backlight on or off"""
@@ -304,34 +330,29 @@ class LCD:
                 f"image must have the same dimensions as the display ({self.__width}x{self.__height})"
             )
 
-        img = np.asarray(image)
-        pix = np.zeros((self.__width, self.__height, 2), dtype=np.uint8)
-        pix[..., [0]] = np.add(
-            np.bitwise_and(img[..., [0]], 0xF8), np.right_shift(img[..., [1]], 5)
-        )
-        pix[..., [1]] = np.add(
-            np.bitwise_and(np.left_shift(img[..., [1]], 3), 0xE0),
-            np.right_shift(img[..., [2]], 3),
-        )
-        pix = pix.flatten().tolist()
+        # convert to RGB565, big endian
+        img = np.asarray(image.convert("RGB"), dtype=np.uint8)
+        pix = np.empty((self.__height, self.__width, 2), dtype=np.uint8)
+        pix[..., 0] = (img[..., 0] & 0xF8) | (img[..., 1] >> 5)
+        pix[..., 1] = ((img[..., 1] << 3) & 0xE0) | (img[..., 2] >> 3)
 
         self.__set_window(0, 0, self.__width, self.__height)
-        for i in range(0, len(pix), 4096):
-            self.__write_data(pix[i : i + 4096])
+        self.__write_data(pix.tobytes())
 
 
 if __name__ == "__main__":
     from PIL import Image, ImageDraw
 
-    lcd = LCD(LCD_1IN44_Config, LCD_1IN44_Pins)
-    lcd.clear()
+    with LCD(LCD_1IN44_Config, LCD_1IN44_Pins) as lcd:
+        lcd.clear()
 
-    image = Image.new("RGB", (lcd.width, lcd.height), "WHITE")
-    draw = ImageDraw.Draw(image)
+        image = Image.new("RGB", (lcd.width, lcd.height), "WHITE")
+        draw = ImageDraw.Draw(image)
 
-    color = [ "Red", "Orange", "Yellow", "Green", "Cyan", "Blue", "Violet" ]
-    for i in range(7):
-        p: float = i * 9.0
-        draw.rectangle(((p, p),(127-p,127-p)), fill=color[i])
+        color = [ "Red", "Orange", "Yellow", "Green", "Cyan", "Blue", "Violet" ]
+        for i in range(7):
+            p: float = i * 9.0
+            draw.rectangle(((p, p),(127-p,127-p)), fill=color[i])
 
-    lcd.display_image(image)
+        lcd.display_image(image)
+        time.sleep(10)
